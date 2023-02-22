@@ -1,4 +1,4 @@
-import datetime
+import datetime,calendar
 import random
 import re
 from tally.settings import EMAIL_HOST_USER
@@ -5499,8 +5499,12 @@ def stock_items_creation(request):
             per=request.POST['per']
             value=request.POST['value']
             
-            gd=Godown_Items.objects.all().last()
-            gsd=Godown_Items.objects.get(id=gd.id)
+            try:
+                gd=Godown_Items.objects.all().last()
+                gsd=Godown_Items.objects.get(id=gd.id)
+            except:
+                gd = None
+                gsd = None
 
             crt=stock_itemcreation(name=nm,alias=alias,under_id=under,units=units,batches=batches,trackdate=trackdate,expirydate=expirydate,typ_sply=typ_sply,
             gst_applicable=gst_applicable,set_alter=set_alter,rate_of_duty=rate_of_duty,quantity=quantity,rate=rate,per=per,value=value,godown=gsd)
@@ -13582,3 +13586,248 @@ def create_voucher_crd_fr(request):
             return redirect('list_crd_voucher')
         return render(request,'vouchers.html',{'tally':tally})
     return redirect('/')
+
+
+
+#----Nithya--stock summary---------------
+
+def stock_summary(request):
+
+    if 't_id' in request.session:
+        if request.session.has_key('t_id'):
+            t_id = request.session['t_id']
+        else:
+            return redirect('/')
+        
+        if fmonths.objects.values().exists() is False:
+            m = list(calendar.month_name)
+            for i in range(1,len(m)):
+                f = fmonths()
+                f.month_name = m[i]
+                f.save()
+
+        comp = Companies.objects.get(id=t_id)
+        group = CreateStockGrp.objects.all().values()
+
+        sum = 0
+        for g in group:
+            value1 = 0
+            item = stock_itemcreation.objects.filter(under_id = g['id']).values('value')
+            for i in item:
+                value1 += int(i['value'])
+            g['total'] = value1
+            sum += value1
+            
+        startdate = comp.fin_begin
+    context = {
+                'company' : comp,
+                'group' : group,
+                'item' : item,
+                'value' : sum,
+                'startdate' : startdate,
+            }
+    
+    return render(request, 'stock_summary.html', context)
+
+
+def stock_group_summary(request,pk):
+
+    if 't_id' in request.session:
+        if request.session.has_key('t_id'):
+            t_id = request.session['t_id']
+        else:
+            return redirect('/')
+
+        comp = Companies.objects.get(id=t_id)
+        group = CreateStockGrp.objects.get(id = pk)
+        item = stock_itemcreation.objects.filter(under_id = group.id)
+        value = 0
+        for i in item:
+            value += int(i.value)
+
+        startdate = comp.fin_begin
+
+    context = {
+            'company' : comp,
+            'group' : group,
+            'item' : item,
+            'value' : value,
+            'startdate' : startdate,
+        }
+
+    return render(request, 'stock_group_summary.html',context)
+
+def stock_item_monthly_summary(request,pk):
+        
+        if 't_id' in request.session:
+            if request.session.has_key('t_id'):
+                t_id = request.session['t_id']
+            else:
+                return redirect('/')
+
+        comp = Companies.objects.get(id=t_id)
+        
+
+        months = fmonths.objects.values()
+        item = stock_itemcreation.objects.get(id=pk)
+        vouch = stock_item_voucher.objects.filter(item_id = item.id)
+
+        beg_date = comp.fin_begin
+
+        if vouch.exists():
+            v = vouch.latest('date')
+            new_date = (v.date)
+        else:
+            new_date = comp.fin_begin
+
+        total_inqty = total_inval = total_outqty = total_outval = 0
+        sum_in_qty = sum_in_val = sum_out_qty = sum_out_val = 0
+        in_qty = in_val = out_qty = out_val =0
+        total_qty = int(item.quantity)
+        total_val = int(item.value)
+
+        for mnth in months:
+            
+            if vouch.exists():
+
+                for v in vouch:
+                    print(v.month_id)
+                    if v.month_id == mnth['id']:
+                        
+                        in_qty = 0 if v.inwards_qty is None else v.inwards_qty
+                        in_val = 0 if v.inwards_val is None else v.inwards_val
+                        out_qty = 0 if v.outwards_qty is None else v.outwards_qty
+                        out_val = 0 if v.outwards_val is None else v.outwards_val
+                        print(in_val)
+                        print(out_qty)
+
+                        total_inqty += in_qty
+                        total_inval += in_val
+                        total_outqty += out_qty
+                        total_outval += out_val
+
+                        if v.Voucher_type == 'Purchase':
+                            mnth['total_inqty'] = total_inqty
+                            mnth['total_inval'] = total_inval
+                        else:
+                            mnth['total_outqty'] = total_outqty
+                            mnth['total_outval'] = total_outval
+                        
+                        total_qty += in_qty - out_qty
+                        total_val += in_val - out_val
+
+                        mnth['total_qty'] = total_qty
+                        mnth['total_val'] = total_val
+
+                        sum_in_qty += in_qty
+                        sum_in_val += in_val
+                        sum_out_qty += out_qty
+                        sum_out_val += out_val  
+
+                total_inqty = total_inval = total_outqty = total_outval = 0
+            
+        last_qty = total_qty
+        last_val = total_val
+
+        
+        context = {
+                    'company' : comp,
+                    'months' : months,
+                    'item' : item,
+                    'voucher' : vouch,
+                    'tot_qty' :last_qty,
+                    'tot_val' : last_val,
+                    'sum_in_qty' : sum_in_qty,
+                    'sum_in_val' : sum_in_val,
+                    'sum_out_qty' : sum_out_qty,
+                    'sum_out_val' : sum_out_val,
+                     'beg_date' : beg_date,
+                     'new_date' : new_date,
+                    
+                }
+
+        return render(request,'stock_item_monthly_summary.html',context)
+
+def stock_item_vouchers(request,pk,id):
+
+    if 't_id' in request.session:
+        if request.session.has_key('t_id'):
+            t_id = request.session['t_id']
+        else:
+            return redirect('/')
+
+        comp = Companies.objects.get(id = t_id)
+        
+        item = stock_itemcreation.objects.get(id = pk)
+        mnth = fmonths.objects.get(id = id)
+        voucher = stock_item_voucher.objects.filter(item_id = item.id)
+
+        for v in voucher:
+            # if v.Voucher_type == 'Purchase':
+            #     inwards_value = v.inwards_qty * v.rate * v.per
+            #     v.inwards_val = inwards_value 
+            # else:
+            #     outwards_value = v.outwards_qty * v.rate * v.per
+            #     v.outwards_val = outwards_value
+
+            v_month = v.date.strftime('%B')
+            m_id = fmonths.objects.get(month_name = v_month)
+
+            v.month = m_id
+            v.save()
+
+            
+
+        vouch = stock_item_voucher.objects.filter(month = mnth,item_id = item.id)
+        qty = sum_in_qty = int(item.quantity)
+        val = sum_in_val = int(item.value)
+
+        sum_out_qty = sum_out_val = beg_date = end_date= 0
+
+        for v in vouch:    
+
+            in_qty = 0 if v.inwards_qty is None else v.inwards_qty
+            in_val = 0 if v.inwards_val is None else v.inwards_val
+            out_qty = 0 if v.outwards_qty is None else v.outwards_qty
+            out_val = 0 if v.outwards_val is None else v.outwards_val
+
+            qty += in_qty-out_qty
+            val += in_val-out_val
+
+            v.closing_qty = qty
+            v.closing_val = val
+            v.save()
+
+            sum_in_qty += in_qty
+            sum_in_val += in_val
+            sum_out_qty += out_qty
+            sum_out_val += out_val
+            
+        m =  int(datetime.strptime(mnth.month_name, '%B').month)
+        y = int(v.date.strftime('%Y'))
+        beg_date = datetime(y,m,1).date().strftime('1-%b-%y')
+
+        if mnth.month_name != 'December':
+            m2 =  int(datetime.strptime(mnth.month_name, '%B').month)+1
+        else:
+            m2 = 10
+            y = int(v.date.strftime('%Y'))
+        end_date = (datetime(y,m2,1) - timedelta(days=1)).date().strftime('%d-%b-%y')
+
+
+        context = {
+                    'company' : comp,
+                    'item' : item,
+                    'voucher' : vouch,
+                    'mnth' : mnth,
+                    'sum_in_qty' : sum_in_qty,
+                    'sum_in_val' : sum_in_val,
+                    'sum_out_qty' : sum_out_qty,
+                    'sum_out_val' : sum_out_val,
+                    'sum_closing_qty': qty,
+                    'sum_closing_val':val, 
+                    'beg_date' : beg_date, 
+                    'end_date' : end_date
+                  }
+    
+        return render(request,'stock_item_vouchers.html',context)

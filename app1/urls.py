@@ -797,6 +797,7 @@ urlpatterns = [
     path('bank_transcation' , views.bank_transcation, name='bank_transcation'), 
 
     #credit section
+    
     path('credit_notess/',views.credit_notess,name='credit_notess'),
     path('itemdata/',views.itemdata,name='itemdata'),
     path('create_credit/',views.create_credit,name='create_credit'), 
@@ -847,9 +848,19 @@ urlpatterns = [
     path('create_voucher_dbt_fr/',views.create_voucher_dbt_fr,name='create_voucher_dbt_fr'),
     path('vouchers_crd_fr/',views.vouchers_crd_fr,name='vouchers_crd_fr'),
     path('create_voucher_crd_fr/',views.create_voucher_crd_fr,name='create_voucher_crd_fr'),
+
+
+
+     #-------Nithya----stock summary-----------------
+
+    path('stock_summary',views.stock_summary,name = 'stock_summary'),
+    path('stock_group_summary/<pk>',views.stock_group_summary,name = 'stock_group_summary'),
+    path('stock_item_monthly_summary/<pk>',views.stock_item_monthly_summary,name='stock_item_monthly_summary'),
+    path('stock_item_vouchers/<pk>/<id>',views.stock_item_vouchers,name='stock_item_vouchers'),
+
     
 
-    path(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}),
+    #path(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}),
               
                          
 
